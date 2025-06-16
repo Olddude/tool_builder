@@ -97,3 +97,6 @@ temp/
 
 # TypeScript
 *.tsbuildinfo
+
+# Data
+data/

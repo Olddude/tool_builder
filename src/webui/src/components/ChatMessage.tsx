@@ -291,6 +291,22 @@ export default function ChatMessage({
           />
         </div>
       )}
+      {msg.files && msg.files.length > 0 && (
+        <div className="flex flex-wrap gap-2 mx-4 mt-1 mb-1">
+          {msg.files.map((file: any, idx: number) => (
+            <a
+              key={idx}
+              href={file.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="badge badge-info"
+              download={file.name}
+            >
+              {file.name}
+            </a>
+          ))}
+        </div>
+      )}
     </div>
   );
 }

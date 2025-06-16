@@ -1,11 +1,29 @@
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, ChangeEvent } from 'react';
 import { CallbackGeneratedChunk, useAppContext } from '../utils/app.context';
 import ChatMessage from './ChatMessage';
-import { CanvasType, Message, PendingMessage } from '../utils/types';
+import { CanvasType, Message, PendingMessage, MessageExtra } from '../utils/types';
 import { classNames, cleanCurrentUrl, throttle } from '../utils/misc';
 import CanvasPyInterpreter from './CanvasPyInterpreter';
 import StorageUtils from '../utils/storage';
 import { useVSCodeContext } from '../utils/llama-vscode';
+
+/**
+ * Helper function to read a file as text
+ */
+const readFileAsText = (file: File): Promise<string> => {
+  return new Promise((resolve, reject) => {
+    const reader = new FileReader();
+    reader.onload = (event) => {
+      if (event.target?.result) {
+        resolve(event.target.result as string);
+      } else {
+        reject(new Error('Failed to read file'));
+      }
+    };
+    reader.onerror = () => reject(new Error('File reading error'));
+    reader.readAsText(file);
+  });
+};
 
 /**
  * A message display is a message node with additional information for rendering.
@@ -116,6 +134,8 @@ export default function ChatScreen() {
   const pendingMsg: PendingMessage | undefined =
     pendingMessages[currConvId ?? ''];
 
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+
   useEffect(() => {
     // reset to latest node when conversation changes
     setCurrNodeId(-1);
@@ -130,6 +150,16 @@ export default function ChatScreen() {
     scrollToBottom(true);
   };
 
+  const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
+    if (e.target.files) {
+      setSelectedFiles(Array.from(e.target.files));
+    }
+  };
+
+  const removeFile = (indexToRemove: number) => {
+    setSelectedFiles(files => files.filter((_, index) => index !== indexToRemove));
+  };
+
   const sendNewMessage = async () => {
     const lastInpMsg = textarea.value();
     if (lastInpMsg.trim().length === 0 || isGenerating(currConvId ?? ''))
@@ -137,6 +167,30 @@ export default function ChatScreen() {
     textarea.setValue('');
     scrollToBottom(false);
     setCurrNodeId(-1);
+    
+    // Process selected files and convert them to MessageExtra format
+    const fileExtras: MessageExtra[] = [];
+    for (const file of selectedFiles) {
+      try {
+        const content = await readFileAsText(file);
+        fileExtras.push({
+          type: 'textFile',
+          name: file.name,
+          content: content,
+        });
+      } catch (error) {
+        console.error(`Error reading file ${file.name}:`, error);
+        // You might want to show a user-friendly error message here
+        alert(`Error reading file ${file.name}: ${error}`);
+      }
+    }
+    
+    // Combine currExtra with file extras
+    const messageExtra: Message['extra'] = [
+      ...(currExtra || []),
+      ...fileExtras,
+    ];
+    
     // get the last message node
     const lastMsgNodeId = messages.at(-1)?.msg.id ?? null;
     if (
@@ -144,12 +198,15 @@ export default function ChatScreen() {
         currConvId,
         lastMsgNodeId,
         lastInpMsg,
-        currExtra,
+        messageExtra.length > 0 ? messageExtra : undefined,
         onChunk
       ))
     ) {
       // restore the input message if failed
       textarea.setValue(lastInpMsg);
+    } else {
+      // Reset selected files only if message was sent successfully
+      setSelectedFiles([]);
     }
     // OK
     clearExtraContext();
@@ -249,6 +306,12 @@ export default function ChatScreen() {
 
         {/* chat input */}
         <div className="flex flex-row items-center pt-8 pb-6 sticky bottom-0 bg-base-100">
+          <input
+            type="file"
+            multiple
+            className="file-input file-input-bordered mr-2"
+            onChange={handleFileChange}
+          />
           <textarea
             className="textarea textarea-bordered w-full"
             placeholder="Type a message (Shift+Enter to add a new line)"
@@ -277,6 +340,23 @@ export default function ChatScreen() {
             </button>
           )}
         </div>
+        {/* Show selected files */}
+        {selectedFiles.length > 0 && (
+          <div className="flex flex-wrap gap-2 px-2 pb-2">
+            {selectedFiles.map((file, idx) => (
+              <div key={idx} className="badge badge-outline flex items-center gap-1">
+                <span>{file.name}</span>
+                <button
+                  onClick={() => removeFile(idx)}
+                  className="btn btn-xs btn-circle btn-ghost"
+                  title="Remove file"
+                >
+                  ×
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
       </div>
       <div className="w-full sticky top-[7em] h-[calc(100vh-9em)]">
         {canvasData?.type === CanvasType.PY_INTERPRETER && (

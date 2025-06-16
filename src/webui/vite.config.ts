@@ -70,7 +70,7 @@ export default defineConfig({
   plugins: process.env.ANALYZE ? FRONTEND_PLUGINS : BUILD_PLUGINS,
   server: {
     proxy: {
-      '/v1': 'http://localhost:8080',
+      '/v1': 'http://localhost:1234',
     },
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',

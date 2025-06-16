@@ -48,7 +48,7 @@ export interface Message {
   children: Message['id'][];
 }
 
-type MessageExtra = MessageExtraTextFile | MessageExtraContext; // TODO: will add more in the future
+export type MessageExtra = MessageExtraTextFile | MessageExtraContext; // TODO: will add more in the future
 
 export interface MessageExtraTextFile {
   type: 'textFile';

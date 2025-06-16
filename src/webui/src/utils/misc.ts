@@ -62,6 +62,8 @@ export function normalizeMsgsForAPI(messages: Readonly<Message[]>) {
     for (const extra of msg.extra ?? []) {
       if (extra.type === 'context') {
         newContent += `${extra.content}\n\n`;
+      } else if (extra.type === 'textFile') {
+        newContent += `\n\n--- File: ${extra.name} ---\n${extra.content}\n--- End of File ---\n\n`;
       }
     }
 
