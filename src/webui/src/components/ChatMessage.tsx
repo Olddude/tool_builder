@@ -4,6 +4,7 @@ import { Message, PendingMessage } from '../utils/types';
 import { classNames } from '../utils/misc';
 import MarkdownDisplay, { CopyButton } from './MarkdownDisplay';
 import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
+import { formatFileSize, getFileCategory } from '../utils/fileUtils';
 
 interface SplitMessage {
   content: PendingMessage['content'];
@@ -171,19 +172,90 @@ export default function ChatMessage({
                           Extra content
                         </summary>
                         <div className="collapse-content">
-                          {msg.extra.map(
-                            (extra, i) =>
-                              extra.type === 'textFile' ? (
-                                <div key={extra.name}>
-                                  <b>{extra.name}</b>
-                                  <pre>{extra.content}</pre>
+                          {msg.extra.map((extra, i) => {
+                            if (extra.type === 'textFile') {
+                              return (
+                                <div key={extra.name} className="mb-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <b className="text-sm">{extra.name}</b>
+                                    <span className="text-xs text-gray-500">Text File</span>
+                                  </div>
+                                  <pre className="text-xs bg-base-100 p-2 rounded overflow-auto max-h-64">
+                                    {extra.content}
+                                  </pre>
                                 </div>
-                              ) : extra.type === 'context' ? (
-                                <div key={i}>
-                                  <pre>{extra.content}</pre>
+                              );
+                            } else if (extra.type === 'file') {
+                              const fileCategory = getFileCategory(extra.mimeType);
+                              const fileSize = formatFileSize(extra.size);
+                              
+                              return (
+                                <div key={extra.name} className="mb-4">
+                                  <div className="flex items-center justify-between mb-2">
+                                    <b className="text-sm">{extra.name}</b>
+                                    <span className="text-xs text-gray-500">
+                                      {fileCategory} • {fileSize}
+                                    </span>
+                                  </div>
+                                  
+                                  {extra.isText ? (
+                                    // Display decoded text content for text files stored as base64
+                                    <div>
+                                      <pre className="text-xs bg-base-100 p-2 rounded overflow-auto max-h-64">
+                                        {(() => {
+                                          try {
+                                            return atob(extra.content);
+                                          } catch {
+                                            return '[Unable to decode text content]';
+                                          }
+                                        })()}
+                                      </pre>
+                                    </div>
+                                  ) : extra.mimeType.startsWith('image/') ? (
+                                    // Display image preview
+                                    <div className="max-w-sm">
+                                      <img
+                                        src={`data:${extra.mimeType};base64,${extra.content}`}
+                                        alt={extra.name}
+                                        className="max-w-full h-auto rounded border"
+                                        style={{ maxHeight: '200px' }}
+                                      />
+                                    </div>
+                                  ) : (
+                                    // For other binary files, show file info and download option
+                                    <div className="text-sm">
+                                      <p className="text-gray-600 mb-2">
+                                        Binary file • {extra.mimeType}
+                                      </p>
+                                      <button
+                                        onClick={() => {
+                                          const link = document.createElement('a');
+                                          link.href = `data:${extra.mimeType};base64,${extra.content}`;
+                                          link.download = extra.name;
+                                          link.click();
+                                        }}
+                                        className="btn btn-sm btn-outline"
+                                      >
+                                        Download
+                                      </button>
+                                    </div>
+                                  )}
                                 </div>
-                              ) : null // TODO: support other extra types
-                          )}
+                              );
+                            } else if (extra.type === 'context') {
+                              return (
+                                <div key={i} className="mb-4">
+                                  <div className="mb-2">
+                                    <span className="text-sm font-semibold text-gray-500">Context</span>
+                                  </div>
+                                  <pre className="text-xs bg-base-100 p-2 rounded overflow-auto max-h-64">
+                                    {extra.content}
+                                  </pre>
+                                </div>
+                              );
+                            }
+                            return null;
+                          })}
                         </div>
                       </details>
                     )}
@@ -289,22 +361,6 @@ export default function ChatMessage({
             className="badge btn-mini show-on-hover mr-2"
             content={msg.content}
           />
-        </div>
-      )}
-      {msg.files && msg.files.length > 0 && (
-        <div className="flex flex-wrap gap-2 mx-4 mt-1 mb-1">
-          {msg.files.map((file: any, idx: number) => (
-            <a
-              key={idx}
-              href={file.url}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="badge badge-info"
-              download={file.name}
-            >
-              {file.name}
-            </a>
-          ))}
         </div>
       )}
     </div>

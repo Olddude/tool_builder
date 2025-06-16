@@ -18,17 +18,23 @@ const GUIDE_FOR_FRONTEND = `
 -->
 `.trim();
 
+interface IndexHtmlGzBundleConfig {
+  build: {
+    outDir: string
+  }
+}
+
 const FRONTEND_PLUGINS = [react()];
 
 const BUILD_PLUGINS = [
   ...FRONTEND_PLUGINS,
   viteSingleFile(),
-  (function llamaCppPlugin() {
-    let config: any;
+  (function indexHtmlGzBundle() {
+    let config: IndexHtmlGzBundleConfig;
     return {
-      name: 'llamacpp:build',
+      name: 'custom:bundle',
       apply: 'build',
-      async configResolved(_config: any) {
+      async configResolved(_config: IndexHtmlGzBundleConfig) {
         config = _config;
       },
       writeBundle() {
@@ -51,14 +57,11 @@ const BUILD_PLUGINS = [
         if (compressed.byteLength > MAX_BUNDLE_SIZE) {
           throw new Error(
             `Bundle size is too large (${Math.ceil(compressed.byteLength / 1024)} KB).\n` +
-              `Please reduce the size of the frontend or increase MAX_BUNDLE_SIZE in vite.config.js.\n`
+              `Please reduce the size of the frontend or increase MAX_BUNDLE_SIZE in vite.config.ts.\n`
           );
         }
 
-        const targetOutputFile = path.join(
-          config.build.outDir,
-          '../../public/index.html.gz'
-        );
+        const targetOutputFile = path.join(config.build.outDir, 'index.html.gz');
         fs.writeFileSync(targetOutputFile, compressed);
       },
     } satisfies PluginOption;
