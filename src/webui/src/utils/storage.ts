@@ -1,8 +1,9 @@
-// coversations is stored in localStorage
+// conversations is stored in IndexedDB
 // format: { [convId]: { id: string, lastModified: number, messages: [...] } }
 
 import { CONFIG_DEFAULT } from '../Config';
 import { Conversation, Message, TimingReport } from './types';
+import { Document } from './rag';
 import Dexie, { Table } from 'dexie';
 
 const event = new EventTarget();
@@ -21,6 +22,7 @@ const dispatchConversationChange = (convId: string) => {
 const db = new Dexie('LlamacppWebui') as Dexie & {
   conversations: Table<Conversation>;
   messages: Table<Message>;
+  ragDocuments: Table<Document>;
 };
 
 // https://dexie.org/docs/Version/Version.stores()
@@ -28,6 +30,13 @@ db.version(1).stores({
   // Unlike SQL, you don’t need to specify all properties but only the one you wish to index.
   conversations: '&id, lastModified',
   messages: '&id, convId, [convId+id], timestamp',
+});
+
+// Add RAG documents table in version 2
+db.version(2).stores({
+  conversations: '&id, lastModified',
+  messages: '&id, convId, [convId+id], timestamp',
+  ragDocuments: '&id, title, metadata.timestamp',
 });
 
 // convId is a string prefixed with 'conv-'
