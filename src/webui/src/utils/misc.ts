@@ -64,6 +64,21 @@ export function normalizeMsgsForAPI(messages: Readonly<Message[]>) {
         newContent += `${extra.content}\n\n`;
       } else if (extra.type === 'textFile') {
         newContent += `\n\n--- File: ${extra.name} ---\n${extra.content}\n--- End of File ---\n\n`;
+      } else if (extra.type === 'file') {
+        if (extra.isText) {
+          // For text files stored as base64, decode and display as text
+          try {
+            const textContent = atob(extra.content);
+            newContent += `\n\n--- File: ${extra.name} (${extra.mimeType}) ---\n${textContent}\n--- End of File ---\n\n`;
+          } catch {
+            // If decoding fails, show file info only
+            newContent += `\n\n--- File: ${extra.name} ---\nType: ${extra.mimeType}\nSize: ${Math.round(extra.size / 1024)}KB\nContent: [Base64 encoded text file - decoding failed]\n--- End of File ---\n\n`;
+          }
+        } else {
+          // For binary files, include metadata and indicate base64 content
+          const sizeKB = Math.round(extra.size / 1024);
+          newContent += `\n\n--- File: ${extra.name} ---\nType: ${extra.mimeType}\nSize: ${sizeKB}KB\nContent: [Base64 encoded binary data]\nBase64: data:${extra.mimeType};base64,${extra.content}\n--- End of File ---\n\n`;
+        }
       }
     }
 

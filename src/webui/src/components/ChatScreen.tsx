@@ -6,24 +6,7 @@ import { classNames, cleanCurrentUrl, throttle } from '../utils/misc';
 import CanvasPyInterpreter from './CanvasPyInterpreter';
 import StorageUtils from '../utils/storage';
 import { useVSCodeContext } from '../utils/llama-vscode';
-
-/**
- * Helper function to read a file as text
- */
-const readFileAsText = (file: File): Promise<string> => {
-  return new Promise((resolve, reject) => {
-    const reader = new FileReader();
-    reader.onload = (event) => {
-      if (event.target?.result) {
-        resolve(event.target.result as string);
-      } else {
-        reject(new Error('Failed to read file'));
-      }
-    };
-    reader.onerror = () => reject(new Error('File reading error'));
-    reader.readAsText(file);
-  });
-};
+import { processFile, formatFileSize, getFileCategory } from '../utils/fileUtils';
 
 /**
  * A message display is a message node with additional information for rendering.
@@ -152,12 +135,17 @@ export default function ChatScreen() {
 
   const handleFileChange = (e: ChangeEvent<HTMLInputElement>) => {
     if (e.target.files) {
-      setSelectedFiles(Array.from(e.target.files));
+      const newFiles = Array.from(e.target.files);
+      setSelectedFiles(newFiles);
     }
   };
 
   const removeFile = (indexToRemove: number) => {
     setSelectedFiles(files => files.filter((_, index) => index !== indexToRemove));
+  };
+
+  const clearAllFiles = () => {
+    setSelectedFiles([]);
   };
 
   const sendNewMessage = async () => {
@@ -170,18 +158,30 @@ export default function ChatScreen() {
     
     // Process selected files and convert them to MessageExtra format
     const fileExtras: MessageExtra[] = [];
+    const processingErrors: string[] = [];
+    
     for (const file of selectedFiles) {
       try {
-        const content = await readFileAsText(file);
-        fileExtras.push({
-          type: 'textFile',
-          name: file.name,
-          content: content,
-        });
+        const fileExtra = await processFile(file);
+        fileExtras.push(fileExtra);
       } catch (error) {
-        console.error(`Error reading file ${file.name}:`, error);
-        // You might want to show a user-friendly error message here
-        alert(`Error reading file ${file.name}: ${error}`);
+        const errorMessage = error instanceof Error ? error.message : `Error processing file ${file.name}`;
+        console.error(`Error processing file ${file.name}:`, error);
+        processingErrors.push(errorMessage);
+      }
+    }
+    
+    // Show errors if any occurred
+    if (processingErrors.length > 0) {
+      const errorSummary = processingErrors.length === 1 
+        ? processingErrors[0]
+        : `Failed to process ${processingErrors.length} file(s):\n${processingErrors.join('\n')}`;
+      alert(errorSummary);
+      
+      // If all files failed, restore input and return
+      if (fileExtras.length === 0 && selectedFiles.length > 0) {
+        textarea.setValue(lastInpMsg);
+        return;
       }
     }
     
@@ -306,12 +306,28 @@ export default function ChatScreen() {
 
         {/* chat input */}
         <div className="flex flex-row items-center pt-8 pb-6 sticky bottom-0 bg-base-100">
-          <input
-            type="file"
-            multiple
-            className="file-input file-input-bordered mr-2"
-            onChange={handleFileChange}
-          />
+          <div className="flex flex-col gap-2 mr-2">
+            <input
+              type="file"
+              multiple
+              className="file-input file-input-bordered file-input-sm"
+              onChange={handleFileChange}
+              title="Upload files (text files, images, documents, etc.)"
+              accept="*/*"
+            />
+            {selectedFiles.length > 0 && (
+              <div className="flex items-center gap-2 text-xs text-gray-500">
+                <span>{selectedFiles.length} file{selectedFiles.length > 1 ? 's' : ''} selected</span>
+                <button
+                  onClick={clearAllFiles}
+                  className="btn btn-xs btn-ghost text-red-500 hover:text-red-700"
+                  title="Clear all files"
+                >
+                  Clear all
+                </button>
+              </div>
+            )}
+          </div>
           <textarea
             className="textarea textarea-bordered w-full"
             placeholder="Type a message (Shift+Enter to add a new line)"
@@ -343,18 +359,29 @@ export default function ChatScreen() {
         {/* Show selected files */}
         {selectedFiles.length > 0 && (
           <div className="flex flex-wrap gap-2 px-2 pb-2">
-            {selectedFiles.map((file, idx) => (
-              <div key={idx} className="badge badge-outline flex items-center gap-1">
-                <span>{file.name}</span>
-                <button
-                  onClick={() => removeFile(idx)}
-                  className="btn btn-xs btn-circle btn-ghost"
-                  title="Remove file"
-                >
-                  ×
-                </button>
-              </div>
-            ))}
+            {selectedFiles.map((file, idx) => {
+              const fileCategory = getFileCategory(file.type || 'application/octet-stream');
+              const fileSize = formatFileSize(file.size);
+              return (
+                <div key={idx} className="badge badge-outline flex items-center gap-1 p-2 max-w-xs">
+                  <div className="flex flex-col items-start text-xs">
+                    <span className="font-medium truncate max-w-[120px]" title={file.name}>
+                      {file.name}
+                    </span>
+                    <span className="text-xs opacity-70">
+                      {fileCategory} • {fileSize}
+                    </span>
+                  </div>
+                  <button
+                    onClick={() => removeFile(idx)}
+                    className="btn btn-xs btn-circle btn-ghost ml-1"
+                    title="Remove file"
+                  >
+                    ×
+                  </button>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>

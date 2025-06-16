@@ -48,12 +48,21 @@ export interface Message {
   children: Message['id'][];
 }
 
-export type MessageExtra = MessageExtraTextFile | MessageExtraContext; // TODO: will add more in the future
+export type MessageExtra = MessageExtraTextFile | MessageExtraContext | MessageExtraFile; // TODO: will add more in the future
 
 export interface MessageExtraTextFile {
   type: 'textFile';
   name: string;
   content: string;
+}
+
+export interface MessageExtraFile {
+  type: 'file';
+  name: string;
+  mimeType: string;
+  size: number;
+  content: string; // base64 encoded content
+  isText?: boolean; // indicates if this is a text file that can be displayed inline
 }
 
 export interface MessageExtraContext {
